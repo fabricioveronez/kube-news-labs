@@ -5,9 +5,11 @@
 # arquivo popula-dados.http (feito para o REST Client do editor). Este Job faz
 # a mesma chamada de dentro do cluster.
 #
-# NAO e idempotente — a app nao verifica duplicata. O nome do Job e fixo
-# justamente por isso: um `kubectl apply` repetido nao o reexecuta. Para
-# recarregar, apague o Job antes.
+# A app nao verifica duplicata, entao o script confere a pagina inicial antes
+# de postar — sem isso, uma reexecucao do Job (timeout, evicao do pod) inseria
+# os 8 artigos de novo. O nome do Job carrega o short SHA porque spec.template
+# de um Job e IMUTAVEL: com nome fixo, mudar o script faz o `kubectl apply`
+# falhar com "field is immutable".
 apiVersion: v1
 kind: ConfigMap
 metadata:

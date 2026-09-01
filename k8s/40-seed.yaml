@@ -91,7 +91,16 @@ spec:
                 echo "aguardando kube-news ficar ready..."
                 sleep 3
               done
-              curl -sS -X POST "$BASE/api/post" \
+              # Guarda de idempotencia. A app nao verifica duplicata e o POST e
+              # em lote: uma reexecucao do Job (timeout, evicao do pod) insere
+              # os 8 artigos de novo. Nao ha endpoint de contagem, entao a
+              # verificacao e pela pagina inicial, que lista os posts.
+              if curl -sf -m 10 "$BASE/" | grep -q 'Kubernetes na Nuvem'; then
+                echo "banco ja populado, nada a fazer"
+                exit 0
+              fi
+
+              curl -sS --fail-with-body -X POST "$BASE/api/post" \
                 -H 'Content-Type: application/json' \
                 --data @/seed/artigos.json
               echo "seed concluido"

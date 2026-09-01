@@ -1,0 +1,103 @@
+# kube-news (Node/Express).
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-news
+  namespace: kube-news
+  labels:
+    app.kubernetes.io/name: kube-news
+    app.kubernetes.io/part-of: kube-news
+spec:
+  selector:
+    app.kubernetes.io/name: kube-news
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kube-news
+  namespace: kube-news
+  labels:
+    app.kubernetes.io/name: kube-news
+    app.kubernetes.io/part-of: kube-news
+  annotations:
+    labs.k8s/commit: "64b44a3ba87153d176e6280b309656786ff4ae15"
+    labs.k8s/source: https://github.com/fabricioveronez/kube-news-labs
+spec:
+  # Uma replica de proposito. O schema e criado no boot por
+  # sequelize.sync({ alter: true }), que emite DDL a cada start de cada
+  # replica — N replicas subindo juntas disputam o mesmo ALTER.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-news
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kube-news
+        app.kubernetes.io/part-of: kube-news
+      annotations:
+        labs.k8s/commit: "64b44a3ba87153d176e6280b309656786ff4ae15"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: kube-news
+          image: docker.io/fabricioveronez/kube-news-labs:64b44a3
+          imagePullPolicy: IfNotPresent
+          ports:
+            # 8080 e hardcoded em src/server.js (app.listen(8080)); a app nao
+            # le process.env.PORT. O ENV PORT do Dockerfile e decorativo.
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: kube-news-config
+          env:
+            - name: DB_DATABASE
+              valueFrom: { secretKeyRef: { name: kube-news-db, key: POSTGRES_DB } }
+            - name: DB_USERNAME
+              valueFrom: { secretKeyRef: { name: kube-news-db, key: POSTGRES_USER } }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: kube-news-db, key: POSTGRES_PASSWORD } }
+          # /health nao toca o banco e responde {state:'up', machine:<hostname>}.
+          # Cuidado ao investigar: PUT /unhealth liga um middleware global que
+          # passa a devolver 500 em TODA rota, /health inclusive, e nao existe
+          # endpoint para reverter — so reiniciando o pod. E o gatilho do
+          # cenario probe-flap.
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: { path: /ready, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 96Mi }
+            limits: { memory: 256Mi }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kube-news
+  namespace: kube-news
+  labels:
+    app.kubernetes.io/part-of: kube-news
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: kube-news.localtest.me
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-news
+                port:
+                  number: 80

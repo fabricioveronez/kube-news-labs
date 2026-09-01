@@ -1,0 +1,46 @@
+# Gerador de trafego do kube-news.
+#
+# Sem requisicao continua nao ha serie de latencia nem de status no Prometheus,
+# nem linha de acesso no Loki — e um incidente injetado num ambiente silencioso
+# nao produz o contraste antes/depois que o diagnostico precisa.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kube-news-traffic
+  namespace: kube-news
+  labels:
+    app.kubernetes.io/name: kube-news-traffic
+    app.kubernetes.io/part-of: kube-news
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-news-traffic
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kube-news-traffic
+        app.kubernetes.io/part-of: kube-news
+    spec:
+      containers:
+        - name: traffic
+          image: curlimages/curl:8.11.1
+          # command, nao args: a imagem tem ENTRYPOINT ["curl"].
+          command:
+            - sh
+            - -c
+            # Sem $( ): o Kubernetes expande a sintaxe $(VAR) em command/args
+            # antes do shell ver. O -w do curl ja imprime o status.
+            - |
+              BASE=http://kube-news.kube-news.svc.cluster.local
+              while true; do
+                for p in / /health /ready; do
+                  curl -s -o /dev/null -m 5 \
+                    -w "traffic path=$p status=%{http_code} time=%{time_total}s\n" \
+                    "$BASE$p" || echo "traffic path=$p status=000"
+                done
+                sleep 1
+              done
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }

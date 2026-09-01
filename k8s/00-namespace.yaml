@@ -1,0 +1,12 @@
+# Namespace do kube-news.
+#
+# Um namespace por aplicacao: o schema do incident response harness exige que
+# cada Linear Project resolva exatamente um namespace, e o hook PreToolUse nega
+# qualquer chamada Kubernetes apontando para outro.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kube-news
+  labels:
+    app.kubernetes.io/part-of: kube-news
+    labs.k8s/project: kube-news

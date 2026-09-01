@@ -1,0 +1,85 @@
+# PostgreSQL do kube-news.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kube-news-db
+  namespace: kube-news
+type: Opaque
+stringData:
+  POSTGRES_DB: kubedevnews
+  POSTGRES_USER: kubedevnews
+  POSTGRES_PASSWORD: kube-news-lab-password
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: kube-news
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: kube-news
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: kube-news
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: kube-news
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/part-of: kube-news
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: kube-news-db
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "kubedevnews", "-d", "kubedevnews"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "kubedevnews", "-d", "kubedevnews"]
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 384Mi }
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 2Gi

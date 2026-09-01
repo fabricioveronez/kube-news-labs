@@ -1,0 +1,22 @@
+# Configuracao de conexao do kube-news.
+#
+# ATENCAO ao ler src/models/post.js: TODAS estas variaveis tem default
+# hardcoded no codigo (DB_HOST cai em "localhost", DB_PASSWORD em "Pg#123").
+# Ou seja, a aplicacao SOBE sem elas e falha silenciosamente tentando conectar
+# em localhost — o oposto de uma falha diagnosticavel.
+#
+# Consumir este ConfigMap por envFrom e o que devolve a falha ruidosa: se o
+# ConfigMap sumir, o kubelet nao cria o container e o pod para em
+# CreateContainerConfigError, com o motivo escrito no evento.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kube-news-config
+  namespace: kube-news
+  labels:
+    app.kubernetes.io/name: kube-news
+    app.kubernetes.io/part-of: kube-news
+data:
+  DB_HOST: postgres.kube-news.svc.cluster.local
+  DB_PORT: "5432"
+  DB_SSL_REQUIRE: "false"

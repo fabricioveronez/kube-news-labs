@@ -1,0 +1,70 @@
+# Observabilidade do kube-news.
+#
+# A app usa express-prom-bundle + collectDefaultMetrics do prom-client, e expoe
+# /metrics na MESMA porta 8080 da aplicacao — nao ha porta de admin separada.
+#
+# Alem das metricas padrao do bundle (http_request_duration_seconds), o
+# src/middleware.js mantem um contador proprio http_requests_total{method,path}.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kube-news
+  namespace: kube-news
+  labels:
+    app.kubernetes.io/name: kube-news
+    app.kubernetes.io/part-of: kube-news
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kube-news
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: kube-news
+  namespace: kube-news
+  labels:
+    app.kubernetes.io/part-of: kube-news
+spec:
+  groups:
+    - name: kube-news.rules
+      rules:
+        - alert: KubeNewsHighErrorRate
+          expr: |
+            sum(rate(http_request_duration_seconds_count{namespace="kube-news",status_code=~"5.."}[5m]))
+              /
+            clamp_min(sum(rate(http_request_duration_seconds_count{namespace="kube-news"}[5m])), 0.001)
+              > 0.05
+          for: 2m
+          labels:
+            severity: critical
+            project: kube-news
+          annotations:
+            summary: "kube-news: mais de 5% das respostas sao 5xx"
+
+        - alert: KubeNewsNotReady
+          expr: |
+            kube_deployment_status_replicas_available{namespace="kube-news",deployment="kube-news"} == 0
+          for: 3m
+          labels:
+            severity: critical
+            project: kube-news
+          annotations:
+            summary: "kube-news: nenhuma replica pronta"
+            description: >-
+              Pode ser banco fora do ar, readiness em /ready retornando 500
+              (PUT /unreadyfor/N), ou o middleware global de /unhealth.
+
+        - alert: KubeNewsPodRestarting
+          expr: |
+            increase(kube_pod_container_status_restarts_total{namespace="kube-news"}[15m]) > 2
+          for: 5m
+          labels:
+            severity: warning
+            project: kube-news
+          annotations:
+            summary: "kube-news: {{ $labels.pod }} reiniciando"

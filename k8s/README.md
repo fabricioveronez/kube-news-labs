@@ -12,9 +12,16 @@ antes do `kubectl apply`.
 | `30-app.yaml` | Service, Deployment e Ingress |
 | `40-seed.yaml` | ConfigMap com os 8 artigos e Job que os posta |
 | `50-observability.yaml` | ServiceMonitor e PrometheusRule |
-| `60-traffic.yaml` | gerador de tráfego contínuo |
 
 ## Detalhes que não são óbvios
+
+**O tráfego sintético não vive mais aqui.** Havia um `60-traffic.yaml` com um
+Deployment de curl em loop dentro deste namespace. Ele batia no ClusterIP, então
+desviava do ingress e deixava o access log e as métricas por router do Traefik
+vazios; suas linhas ainda se misturavam às da aplicação no Loki, e ele contava
+como réplica indisponível no alerta de deployment degradado. A carga passou a
+sair da máquina do operador e entrar pelo Ingress — `make traffic` no
+[labs-k8s](https://github.com/fabricioveronez/labs-k8s).
 
 **A porta 8080 é hardcoded.** `src/server.js` faz `app.listen(8080)` e nunca lê
 `process.env.PORT`. O `ENV PORT=8080` do Dockerfile é decorativo — mudá-lo não muda nada.

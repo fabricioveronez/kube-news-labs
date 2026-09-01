@@ -24,7 +24,7 @@ metadata:
     app.kubernetes.io/name: kube-news
     app.kubernetes.io/part-of: kube-news
   annotations:
-    labs.k8s/commit: "3182d03ecf097f5ffccf9fea4bbb1d8d9f011e61"
+    labs.k8s/commit: "6068b4ecca466807f87fb409c2d225d2f4f10898"
     labs.k8s/source: https://github.com/fabricioveronez/kube-news-labs
 spec:
   # Uma replica de proposito. O schema e criado no boot por
@@ -40,7 +40,7 @@ spec:
         app.kubernetes.io/name: kube-news
         app.kubernetes.io/part-of: kube-news
       annotations:
-        labs.k8s/commit: "3182d03ecf097f5ffccf9fea4bbb1d8d9f011e61"
+        labs.k8s/commit: "6068b4ecca466807f87fb409c2d225d2f4f10898"
     spec:
       securityContext:
         runAsNonRoot: true
@@ -70,7 +70,7 @@ spec:
             limits: { memory: 64Mi }
       containers:
         - name: kube-news
-          image: docker.io/fabricioveronez/kube-news-labs:3182d03
+          image: docker.io/fabricioveronez/kube-news-labs:6068b4e
           imagePullPolicy: IfNotPresent
           ports:
             # 8080 e hardcoded em src/server.js (app.listen(8080)); a app nao

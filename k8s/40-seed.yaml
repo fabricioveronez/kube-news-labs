@@ -65,7 +65,7 @@ data:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: kube-news-seed
+  name: kube-news-seed-348f176
   namespace: kube-news
   labels:
     app.kubernetes.io/name: kube-news-seed

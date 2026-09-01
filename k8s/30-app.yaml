@@ -45,6 +45,29 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
+      # A app conecta no banco durante o boot e MORRE se o DNS do Service ainda
+      # nao resolver — o erro observado foi getaddrinfo ENOTFOUND, seguido de
+      # crashloop ate o Postgres aparecer. Esperar aqui troca dois restarts por
+      # um Init:0/1 legivel, e mantem o baseline do lab silencioso: num
+      # ambiente onde restart e sinal de incidente, restart de partida ensina o
+      # agente a ignorar o sinal.
+      initContainers:
+        - name: wait-for-postgres
+          image: postgres:16-alpine
+          command:
+            - sh
+            - -c
+            # -U explicito: o securityContext do pod vale para o initContainer,
+            # e o UID 1001 nao existe no /etc/passwd da imagem do Postgres —
+            # sem usuario do SO, o pg_isready devolve "no attempt" para sempre.
+            - |
+              until pg_isready -h postgres.kube-news.svc.cluster.local -p 5432 -U kubedevnews; do
+                echo "aguardando postgres..."
+                sleep 2
+              done
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { memory: 64Mi }
       containers:
         - name: kube-news
           image: docker.io/fabricioveronez/kube-news-labs:f97ea1d
